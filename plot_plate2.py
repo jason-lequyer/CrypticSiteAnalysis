@@ -106,7 +106,7 @@ for sample_id in sample_to_condition.keys():
 csv_files = glob.glob('mapping_results/*.csv')
 
 # Organize sample data per plate
-plates = ['plate1', 'plate2']
+plates = ['plate2']
 for idx_plate, plate in enumerate(plates):
     print(f"Processing {plate}...")
 
