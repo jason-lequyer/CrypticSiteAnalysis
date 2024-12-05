@@ -579,19 +579,6 @@ def parse_sam_file(sam_path, mapping_output_csv, extracted_fasta_path):
     df_mapping.to_csv(mapping_output_csv, index=False)
     logging.info(f"Mapping results saved to {mapping_output_csv}.")
 
-# -----------------------------
-# Main Filtering Function
-# -----------------------------
-# (No changes needed here as per user request)
-
-# -----------------------------
-# Mapping Function
-# -----------------------------
-# Note: The duplicate definition has been removed. Only one definition exists above.
-
-# -----------------------------
-# Example Usage
-# -----------------------------
 
 if __name__ == "__main__":
     # Ensure Bowtie2 is installed and the reference genome is ready
