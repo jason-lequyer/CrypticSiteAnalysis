@@ -11,8 +11,16 @@ from matplotlib.lines import Line2D  # Added for custom legend elements
 # Set seaborn style for better aesthetics
 sns.set(style="whitegrid")
 
+def reverse_complement(seq):
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A',
+                  'a': 't', 'c': 'g', 'g': 'c', 't': 'a',
+                  'N': 'N', 'n': 'n'}
+    rc_seq = ''.join([complement.get(base, base) for base in reversed(seq)])
+    return rc_seq.upper()
+
+
 # Parameters for minimum total counts per cryptic site per plate
-min_total_counts = [5, 75]  # Adjust the values as needed for each plate
+min_total_counts = [75]  # Adjust the values as needed for each plate
 
 # Data mapping sample IDs to conditions
 data = [
@@ -122,6 +130,9 @@ for idx_plate, plate in enumerate(plates):
     # Collect sample IDs for this plate
     plate_sample_ids = {sample_id for sample_id, p in sample_to_plate.items() if p == plate}
 
+    # **Modified: Collect cryptic_site information per position**
+    cryptic_site_per_position = defaultdict(lambda: defaultdict(set))  # chrom -> pos -> set of cryptic_sites
+
     # Read CSV files for samples in this plate
     for csv_file in csv_files:
         # Extract sample ID from filename
@@ -161,7 +172,7 @@ for idx_plate, plate in enumerate(plates):
         df['reference_start'] = df['reference_start'].astype(int)
 
         # Check if required columns are present
-        required_columns = {'reference_name', 'reference_start'}
+        required_columns = {'reference_name', 'reference_start', 'cryptic_site'}
         if not required_columns.issubset(df.columns):
             print(f"Required columns missing in {csv_file}. Columns found: {df.columns.tolist()}")
             continue
@@ -170,7 +181,9 @@ for idx_plate, plate in enumerate(plates):
         for idx, row in df.iterrows():
             chrom = row['reference_name']
             pos = row['reference_start']
+            cryptic_site = row['cryptic_site']
             positions_per_chr[chrom].add(pos)
+            cryptic_site_per_position[chrom][pos].add(cryptic_site)
 
         # Store the dataframe per sample
         sample_data[sample_id] = df
@@ -181,6 +194,7 @@ for idx_plate, plate in enumerate(plates):
         print(f"Chromosome {chrom}: {len(positions)} positions")
 
     bins_per_chr = {}
+    cryptic_sites_per_bin = {}  # bin_id -> set of cryptic_sites
     for chrom, positions in positions_per_chr.items():
         sorted_positions = sorted(positions)
         bins = []
@@ -210,6 +224,11 @@ for idx_plate, plate in enumerate(plates):
             end = max(bin_positions) + 100
             bin_id = bin_id_counter
             bin_map[bin_id] = {'chromosome': chrom, 'start': start, 'end': end}
+            # Collect cryptic sites for this bin
+            bin_cryptic_sites = set()
+            for pos in bin_positions:
+                bin_cryptic_sites.update(cryptic_site_per_position[chrom][pos])
+            cryptic_sites_per_bin[bin_id] = bin_cryptic_sites
             itree[start:end+1] = bin_id
             bin_id_counter += 1
         bins_interval_trees[chrom] = itree
@@ -267,6 +286,9 @@ for idx_plate, plate in enumerate(plates):
         # Create a label using chromosome and position
         bin_label = f"{chrom_padded}:{start}"
         row['bin_label'] = bin_label
+        # **Added: Include cryptic site(s)**
+        cryptic_sites_in_bin = cryptic_sites_per_bin.get(bin_id, set())
+        row['cryptic_site'] = ';'.join(sorted(cryptic_sites_in_bin))
         for condition in conditions:
             count = counts_per_condition.get(condition, {}).get(bin_id, 0)
             row[condition] = count
@@ -280,6 +302,7 @@ for idx_plate, plate in enumerate(plates):
 
     # Added: Save counts without applying min_total_counts
     df_plot_full = df_plot.copy()
+    df_plot_full['cryptic_site'] = df_plot_full['cryptic_site'].apply(reverse_complement)
     df_plot_full.to_csv(f'counts_full_{plate}.csv', index=False)
 
     # Calculate total counts per bin across all conditions
@@ -294,7 +317,7 @@ for idx_plate, plate in enumerate(plates):
 
     # Melt the DataFrame for processing
     df_melt = df_plot.melt(
-        id_vars=['bin_id', 'bin_label'],
+        id_vars=['bin_id', 'bin_label', 'cryptic_site'],
         value_vars=list(conditions),
         var_name='Condition',
         value_name='Counts'
@@ -428,7 +451,7 @@ for idx_plate, plate in enumerate(plates):
             marker='o',
             color='w',
             label=condition,
-            markerfacecolor=color_map(condition_to_code[condition] / len(color_map.colors)),
+            markerfacecolor=color_map(condition_to_code[condition] % len(color_map.colors)),
             markersize=8,
             markeredgecolor='k',
             linewidth=0
@@ -449,7 +472,7 @@ for idx_plate, plate in enumerate(plates):
     )
 
     plt.tight_layout()
-    plt.savefig(f'counts_scatter_{plate}.png', dpi=300)
+    plt.savefig(f'counts_scatter_{plate}.pdf', format="pdf", dpi=300)
     plt.close()
 
     # Create DataFrame of counts per sample per bin
@@ -490,5 +513,6 @@ for idx_plate, plate in enumerate(plates):
     plt.ylabel('Number of Cryptic Sites', fontsize=14)
 
     plt.tight_layout()
-    plt.savefig(f'cryptic_sites_per_condition_counts_ge1_reps_ge2_{plate}.png', dpi=300)
+    plt.savefig(f'cryptic_sites_per_condition_counts_ge1_reps_ge2_{plate}.pdf', format="pdf", dpi=300)
     plt.close()
+
