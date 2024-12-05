@@ -533,21 +533,6 @@ def map_sequences(extracted_fasta_path, bowtie2_index_prefix, output_sam_path):
         sys.exit(1)
 
 
-
-# -----------------------------
-# Main Filtering Function
-# -----------------------------
-# (No changes needed here as per user request)
-
-# -----------------------------
-# Mapping Function
-# -----------------------------
-# Note: The duplicate definition has been removed. Only one definition exists above.
-
-# -----------------------------
-# Example Usage
-# -----------------------------
-
 if __name__ == "__main__":
     # Ensure Bowtie2 is installed and the reference genome is ready
     check_bowtie2_installed()
